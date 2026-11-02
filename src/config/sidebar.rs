@@ -427,9 +427,48 @@ pub struct AgentsSidebarConfig {
     #[serde(default, deserialize_with = "deserialize_rows_by_agent")]
     pub rows_by_agent: BTreeMap<String, AgentSidebarRows>,
     pub row_gap: u16,
+    /// A custom `$` token whose value, when set, replaces the `state_icon`
+    /// glyph in every state; the icon keeps its status color. E.g. a progress
+    /// pie a background watch reports.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_state_icon_token",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub state_icon_token: Option<String>,
+}
+
+fn deserialize_state_icon_token<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::IntoDeserializer;
+    let Some(token_text) = Option::<String>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    let parsed_token: Result<AgentSidebarToken, D::Error> =
+        AgentSidebarToken::deserialize(token_text.as_str().into_deserializer());
+    match parsed_token {
+        Ok(AgentSidebarToken::Custom(_)) => Ok(Some(token_text)),
+        _ => Err(serde::de::Error::custom(format!(
+            "state_icon_token must be a custom `$` token, got `{token_text}`"
+        ))),
+    }
 }
 
 impl AgentsSidebarConfig {
+    /// The `state_icon_token` value to show instead of the state icon, if any.
+    pub(crate) fn state_icon_override(
+        &self,
+        tokens: &std::collections::HashMap<String, String>,
+    ) -> Option<String> {
+        let token_name = self.state_icon_token.as_deref()?.strip_prefix('$')?;
+        tokens
+            .get(token_name)
+            .filter(|token_value| !token_value.is_empty())
+            .cloned()
+    }
+
     pub(crate) fn rows_for_agent(&self, agent: Option<Agent>) -> &AgentSidebarRows {
         agent
             .and_then(|agent| self.rows_by_agent.get(crate::detect::agent_label(agent)))
@@ -451,6 +490,7 @@ impl Default for AgentsSidebarConfig {
             ],
             rows_by_agent: BTreeMap::new(),
             row_gap: DEFAULT_SIDEBAR_ROW_GAP,
+            state_icon_token: None,
         }
     }
 }
@@ -485,6 +525,55 @@ pub struct SidebarConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn state_icon_token_replaces_the_icon() {
+        let config: AgentsSidebarConfig = toml::from_str("state_icon_token = '$watch'").unwrap();
+        assert_eq!(
+            config.state_icon_override(&std::collections::HashMap::from([(
+                "watch".to_string(),
+                "◔".to_string()
+            )])),
+            Some("◔".to_string())
+        );
+    }
+
+    #[test]
+    fn state_icon_token_leaves_the_icon_without_a_value() {
+        let config: AgentsSidebarConfig = toml::from_str("state_icon_token = '$watch'").unwrap();
+        assert_eq!(
+            [
+                config.state_icon_override(&Default::default()),
+                config.state_icon_override(&std::collections::HashMap::from([(
+                    "watch".to_string(),
+                    String::new()
+                )])),
+                AgentsSidebarConfig::default().state_icon_override(
+                    &std::collections::HashMap::from([("watch".to_string(), "◔".to_string())]),
+                ),
+            ],
+            [None, None, None]
+        );
+    }
+
+    #[test]
+    fn state_icon_token_refuses_a_builtin_token() {
+        assert_eq!(
+            toml::from_str::<AgentsSidebarConfig>("state_icon_token = 'workspace'")
+                .unwrap_err()
+                .message(),
+            "state_icon_token must be a custom `$` token, got `workspace`"
+        );
+    }
+
+    #[test]
+    fn state_icon_token_round_trips() {
+        let config: AgentsSidebarConfig = toml::from_str("state_icon_token = '$watch'").unwrap();
+        assert_eq!(
+            toml::from_str::<AgentsSidebarConfig>(&toml::to_string(&config).unwrap()).unwrap(),
+            config
+        );
+    }
 
     #[test]
     fn defaults_match_the_compact_agent_and_existing_space_layouts() {
