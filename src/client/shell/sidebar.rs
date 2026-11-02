@@ -160,12 +160,17 @@ pub(crate) fn render_collapsed_sidebar(
                 palette.overlay0
             }),
         );
+        let icon_override = config
+            .agents
+            .state_icon_override(&agent.tokens.iter().cloned().collect());
         put_text(
             buffer,
             rect.x.saturating_add(2),
             rect.y,
             rect.width.saturating_sub(2),
-            status_icon(agent.agent_status, config.status_indicators),
+            icon_override
+                .as_deref()
+                .unwrap_or_else(|| status_icon(agent.agent_status, config.status_indicators)),
             Style::default().fg(status_color(agent.agent_status, palette)),
         );
         hits.agents.push((rect, pane_id));

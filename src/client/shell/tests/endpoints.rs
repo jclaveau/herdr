@@ -529,6 +529,36 @@ fn state_with_scrollable_agents() -> (ClientShellState, ClientEndpointId) {
     (state, remote)
 }
 
+#[test]
+fn collapsed_endpoint_agent_shows_the_state_icon_token() {
+    let (mut state, _) = state_with_remote();
+    state.config.agents.state_icon_token = Some("$watch".into());
+    let mut projection = state
+        .endpoints
+        .iter()
+        .find(|endpoint| endpoint.endpoint_id.is_local())
+        .unwrap()
+        .snapshot
+        .clone()
+        .unwrap();
+    projection.agents = vec![ClientShellAgent {
+        tokens: vec![("watch".into(), "◔".into())],
+        ..agent("pi one", AgentStatus::Working, 1)
+    }];
+    state.set_endpoint_snapshot(&ClientEndpointId::Local, projection);
+    state.sidebar_collapsed = true;
+    let frame = state.compose(100, 28).expect("collapsed endpoint frame");
+    let (agent_rect, _, _) = state
+        .hits
+        .endpoint_agents
+        .iter()
+        .find(|(_, endpoint_id, _)| endpoint_id.is_local())
+        .expect("collapsed local agent row")
+        .clone();
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    assert_eq!(buffer[(agent_rect.x + 1, agent_rect.y)].symbol(), "◔");
+}
+
 /// Checks that the visible toggle wins overlapping scrollbar clicks and can reopen
 /// the sidebar, for both endpoint layouts and both ends of the overflowing list.
 #[test]
