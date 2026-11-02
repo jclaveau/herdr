@@ -448,8 +448,8 @@ where
     };
     let parsed_token: Result<AgentSidebarToken, D::Error> =
         AgentSidebarToken::deserialize(token_text.as_str().into_deserializer());
-    match parsed_token {
-        Ok(AgentSidebarToken::Custom(_)) => Ok(Some(token_text)),
+    match parsed_token? {
+        AgentSidebarToken::Custom(_) => Ok(Some(token_text)),
         _ => Err(serde::de::Error::custom(format!(
             "state_icon_token must be a custom `$` token, got `{token_text}`"
         ))),
@@ -563,6 +563,16 @@ mod tests {
                 .unwrap_err()
                 .message(),
             "state_icon_token must be a custom `$` token, got `workspace`"
+        );
+    }
+
+    #[test]
+    fn state_icon_token_keeps_the_token_parse_error() {
+        assert_eq!(
+            toml::from_str::<AgentsSidebarConfig>("state_icon_token = '$'")
+                .unwrap_err()
+                .message(),
+            "invalid custom sidebar token `$`"
         );
     }
 
