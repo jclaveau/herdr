@@ -438,6 +438,8 @@ pub struct AgentsSidebarConfig {
     pub state_icon_token: Option<String>,
 }
 
+const STATE_ICON_MAX_CELLS: usize = 2;
+
 fn deserialize_state_icon_token<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -457,16 +459,24 @@ where
 }
 
 impl AgentsSidebarConfig {
-    /// The `state_icon_token` value to show instead of the state icon, if any.
+    /// The `state_icon_token` value to show instead of the state icon, if any,
+    /// cut to `STATE_ICON_MAX_CELLS` so a long value cannot push the row's
+    /// other tokens out.
     pub(crate) fn state_icon_override(
         &self,
         tokens: &std::collections::HashMap<String, String>,
     ) -> Option<String> {
         let token_name = self.state_icon_token.as_deref()?.strip_prefix('$')?;
-        tokens
-            .get(token_name)
-            .filter(|token_value| !token_value.is_empty())
-            .cloned()
+        let token_value = tokens.get(token_name)?;
+        let mut used_cells = 0;
+        let capped_value = token_value
+            .chars()
+            .take_while(|value_char| {
+                used_cells += unicode_width::UnicodeWidthChar::width(*value_char).unwrap_or(0);
+                used_cells <= STATE_ICON_MAX_CELLS
+            })
+            .collect::<String>();
+        (!capped_value.is_empty()).then_some(capped_value)
     }
 
     pub(crate) fn rows_for_agent(&self, agent: Option<Agent>) -> &AgentSidebarRows {
@@ -563,6 +573,32 @@ mod tests {
                 .unwrap_err()
                 .message(),
             "state_icon_token must be a custom `$` token, got `workspace`"
+        );
+    }
+
+    #[test]
+    fn state_icon_token_caps_the_value_at_two_cells() {
+        let config: AgentsSidebarConfig = toml::from_str("state_icon_token = '$watch'").unwrap();
+        assert_eq!(
+            [
+                config.state_icon_override(&std::collections::HashMap::from([(
+                    "watch".to_string(),
+                    "⧗ 12/40 steps remaining".to_string()
+                )])),
+                config.state_icon_override(&std::collections::HashMap::from([(
+                    "watch".to_string(),
+                    "◔+2".to_string()
+                )])),
+                config.state_icon_override(&std::collections::HashMap::from([(
+                    "watch".to_string(),
+                    "界x".to_string()
+                )])),
+            ],
+            [
+                Some("⧗ ".to_string()),
+                Some("◔+".to_string()),
+                Some("界".to_string())
+            ]
         );
     }
 
