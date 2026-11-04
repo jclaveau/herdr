@@ -687,6 +687,91 @@ fn collapsed_agent_row_shows_the_state_icon_token() {
 }
 
 #[test]
+fn workspace_row_shows_the_first_pane_state_icon_token() {
+    let mut projected = snapshot();
+    projected.agents = vec![
+        ClientShellAgent {
+            pane_id: "pane_1".into(),
+            workspace_id: "ws_1".into(),
+            tab_id: "tab_1".into(),
+            name: Some("pi one".into()),
+            display_agent: None,
+            agent: Some("pi".into()),
+            title: None,
+            terminal_title: None,
+            terminal_title_stripped: None,
+            agent_status: AgentStatus::Done,
+            state_change_seq: 1,
+            state_labels: Vec::new(),
+            tokens: vec![("watch".into(), "◔".into())],
+            focused: true,
+        },
+        ClientShellAgent {
+            pane_id: "pane_2".into(),
+            workspace_id: "ws_1".into(),
+            tab_id: "tab_1".into(),
+            name: Some("pi two".into()),
+            display_agent: None,
+            agent: Some("pi".into()),
+            title: None,
+            terminal_title: None,
+            terminal_title_stripped: None,
+            agent_status: AgentStatus::Working,
+            state_change_seq: 2,
+            state_labels: Vec::new(),
+            tokens: vec![("watch".into(), "◕".into())],
+            focused: false,
+        },
+    ];
+    let mut config = Config::default();
+    config.ui.sidebar.agents.state_icon_token = Some("$watch".into());
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+    let frame = state.compose(106, 20).expect("expanded sidebar");
+    let workspace_rect = state.hits.workspaces[0].rect;
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    assert_eq!(
+        buffer[(workspace_rect.x + 1, workspace_rect.y)].symbol(),
+        "◔"
+    );
+}
+
+#[test]
+fn collapsed_workspace_row_shows_the_state_icon_token() {
+    let mut projected = snapshot();
+    projected.agents = vec![ClientShellAgent {
+        pane_id: "pane_1".into(),
+        workspace_id: "ws_1".into(),
+        tab_id: "tab_1".into(),
+        name: Some("pi one".into()),
+        display_agent: None,
+        agent: Some("pi".into()),
+        title: None,
+        terminal_title: None,
+        terminal_title_stripped: None,
+        agent_status: AgentStatus::Done,
+        state_change_seq: 1,
+        state_labels: Vec::new(),
+        tokens: vec![("watch".into(), "◔".into())],
+        focused: true,
+    }];
+    let mut config = Config::default();
+    config.ui.sidebar.agents.state_icon_token = Some("$watch".into());
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
+    state.sidebar_collapsed = true;
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+    let frame = state.compose(106, 20).expect("collapsed sidebar");
+    let workspace_rect = state.hits.workspaces[0].rect;
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    assert_eq!(
+        buffer[(workspace_rect.x + 2, workspace_rect.y)].symbol(),
+        "◔"
+    );
+}
+
+#[test]
 fn agent_sidebar_honors_priority_symbols_tokens_and_stable_hits() {
     let mut projected = snapshot();
     let mut second_pane = projected.panes[0].clone();

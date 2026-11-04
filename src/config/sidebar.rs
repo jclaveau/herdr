@@ -429,7 +429,8 @@ pub struct AgentsSidebarConfig {
     pub row_gap: u16,
     /// A custom `$` token whose value, when set, replaces the `state_icon`
     /// glyph in every state; the icon keeps its status color. E.g. a progress
-    /// pie a background watch reports.
+    /// pie a background watch reports. A Spaces row takes the value of the
+    /// first agent pane in its workspace that reports the token.
     #[serde(
         default,
         deserialize_with = "deserialize_state_icon_token",

@@ -177,7 +177,14 @@ pub(super) fn render_collapsed(
                 rect.x.saturating_add(number_width),
                 rect.y,
                 rect.width.saturating_sub(number_width),
-                status_icon(workspace.agent_status, config.status_indicators),
+                super::sidebar::displayed_workspace_state_icon(
+                    snapshot,
+                    workspace,
+                    &std::collections::HashSet::new(),
+                    &config.agents,
+                )
+                .as_deref()
+                .unwrap_or_else(|| status_icon(workspace.agent_status, config.status_indicators)),
                 Style::default()
                     .fg(if stale {
                         palette.overlay0
@@ -447,6 +454,12 @@ pub(super) fn render_expanded(
                     workspace,
                     collapsed_groups,
                 );
+                let state_icon = super::sidebar::displayed_workspace_state_icon(
+                    snapshot,
+                    workspace,
+                    collapsed_groups,
+                    &config.agents,
+                );
                 let tokens = super::sidebar::workspace_rows(
                     workspace,
                     status,
@@ -472,7 +485,9 @@ pub(super) fn render_expanded(
                     buffer,
                     nested,
                     status,
-                    config.status_indicators,
+                    state_icon
+                        .as_deref()
+                        .unwrap_or_else(|| status_icon(status, config.status_indicators)),
                     entry,
                     tokens,
                     endpoint_active && workspace.focused,

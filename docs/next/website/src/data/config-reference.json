@@ -1082,7 +1082,7 @@
           "key": "ui.sidebar.agents.state_icon_token",
           "type": "string",
           "default": "unset",
-          "description": "A $name metadata token whose non-empty value replaces the state_icon glyph in every agent state, keeping the status color; e.g. \"$watch\" for a progress pie a background watch reports. The value is cut to 2 cells. Applies to the expanded and collapsed Agent sidebar. Built-in token names are refused."
+          "description": "A $name metadata token whose non-empty value replaces the state_icon glyph in every agent state, keeping the status color; e.g. \"$watch\" for a progress pie a background watch reports. The value is cut to 2 cells. Applies to the expanded and collapsed Agent sidebar, and to Spaces rows, which take the token of the first agent pane in the workspace that reports it. Built-in token names are refused."
         },
         {
           "key": "ui.sidebar.spaces.row_gap",
