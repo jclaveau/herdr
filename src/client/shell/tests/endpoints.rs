@@ -597,6 +597,44 @@ fn endpoint_workspace_rows_show_the_state_icon_token() {
     assert_eq!(workspace_icons, ["   ◔ client-shell        ", " 1◔"]);
 }
 
+#[test]
+fn endpoint_workspace_row_shows_the_total_icon_left_of_the_state_icon() {
+    let (mut state, _) = state_with_remote();
+    state.config.agents.state_icon_token = Some("$watch".into());
+    state.config.agents.state_icon_total_token = Some("$watch_total".into());
+    let mut projection = state
+        .endpoints
+        .iter()
+        .find(|endpoint| endpoint.endpoint_id.is_local())
+        .unwrap()
+        .snapshot
+        .clone()
+        .unwrap();
+    projection.agents = vec![ClientShellAgent {
+        tokens: vec![
+            ("watch".into(), "◔".into()),
+            ("watch_total".into(), "⧖".into()),
+        ],
+        ..agent("pi one", AgentStatus::Done, 1)
+    }];
+    state.set_endpoint_snapshot(&ClientEndpointId::Local, projection);
+    let frame = state.compose(100, 28).expect("endpoint frame");
+    let workspace_rect = state
+        .hits
+        .workspaces
+        .iter()
+        .find(|hit| hit.endpoint_id.is_local())
+        .expect("local workspace row")
+        .rect;
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    assert_eq!(
+        (workspace_rect.x..workspace_rect.right())
+            .map(|x| buffer[(x, workspace_rect.y)].symbol().to_owned())
+            .collect::<String>(),
+        "   ⧖◔ client-shell       "
+    );
+}
+
 /// Checks that the visible toggle wins overlapping scrollbar clicks and can reopen
 /// the sidebar, for both endpoint layouts and both ends of the overflowing list.
 #[test]
