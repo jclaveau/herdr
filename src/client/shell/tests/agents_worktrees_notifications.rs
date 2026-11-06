@@ -815,6 +815,64 @@ fn expanded_workspace_row_colours_only_the_right_icon() {
 }
 
 #[test]
+fn workspace_row_takes_the_total_from_the_pane_it_takes_the_icon_from() {
+    let mut projected = snapshot();
+    projected.agents = vec![
+        ClientShellAgent {
+            pane_id: "pane_1".into(),
+            workspace_id: "ws_1".into(),
+            tab_id: "tab_1".into(),
+            name: Some("pi".into()),
+            display_agent: None,
+            agent: Some("pi".into()),
+            title: None,
+            terminal_title: None,
+            terminal_title_stripped: None,
+            agent_status: AgentStatus::Working,
+            state_change_seq: 1,
+            state_labels: Vec::new(),
+            tokens: vec![("watch".into(), "◔".into())],
+            focused: false,
+        },
+        ClientShellAgent {
+            pane_id: "pane_2".into(),
+            workspace_id: "ws_1".into(),
+            tab_id: "tab_1".into(),
+            name: Some("pi".into()),
+            display_agent: None,
+            agent: Some("pi".into()),
+            title: None,
+            terminal_title: None,
+            terminal_title_stripped: None,
+            agent_status: AgentStatus::Working,
+            state_change_seq: 1,
+            state_labels: Vec::new(),
+            tokens: vec![
+                ("watch".into(), "◑".into()),
+                ("watch_total".into(), "⧖".into()),
+            ],
+            focused: false,
+        },
+    ];
+    let mut config = Config::default();
+    config.ui.sidebar.agents.state_icon_token = Some("$watch".into());
+    config.ui.sidebar.agents.state_icon_total_token = Some("$watch_total".into());
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+    let frame = state.compose(106, 20).expect("expanded sidebar");
+    let workspace_rect = state.hits.workspaces[0].rect;
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    assert_eq!(
+        [
+            buffer[(workspace_rect.x + 1, workspace_rect.y)].symbol(),
+            buffer[(workspace_rect.x + 2, workspace_rect.y)].symbol(),
+        ],
+        ["◔", " "]
+    );
+}
+
+#[test]
 fn collapsed_rows_have_room_for_the_right_icon_only() {
     let mut state = state_with_total_icon_tokens(true);
     let frame = state.compose(106, 20).expect("collapsed sidebar");

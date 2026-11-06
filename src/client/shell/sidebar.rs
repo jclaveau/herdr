@@ -319,6 +319,12 @@ pub(crate) fn render_sidebar(
             state.collapsed_groups,
             &config.agents,
         );
+        let state_icon_total = displayed_workspace_state_icon_total(
+            snapshot,
+            workspace,
+            state.collapsed_groups,
+            &config.agents,
+        );
         let rows = workspace_rows(workspace, status, entry.indented, &config.spaces);
         let row_height = (rows.len().max(1).min(u16::MAX as usize) as u16).min(body.height);
         if y.saturating_add(row_height) > body.bottom() {
@@ -343,6 +349,7 @@ pub(crate) fn render_sidebar(
             state_icon
                 .as_deref()
                 .unwrap_or_else(|| status_icon(status, config.status_indicators)),
+            state_icon_total.as_deref(),
             entry,
             rows,
             workspace.focused,
@@ -697,6 +704,34 @@ pub(in crate::client::shell) fn displayed_workspace_state_icon(
     collapsed_groups: &HashSet<String>,
     agents_config: &crate::config::AgentsSidebarConfig,
 ) -> Option<String> {
+    first_member_agent_value(snapshot, workspace, collapsed_groups, |pane_tokens| {
+        agents_config.state_icon_override(pane_tokens)
+    })
+}
+
+/// The `state_icon_total_token` value of the pane that
+/// `displayed_workspace_state_icon` reads, which is the first one with a
+/// `state_icon_token` value, since a total needs that value too.
+pub(in crate::client::shell) fn displayed_workspace_state_icon_total(
+    snapshot: &ClientShellSnapshot,
+    workspace: &ClientShellWorkspace,
+    collapsed_groups: &HashSet<String>,
+    agents_config: &crate::config::AgentsSidebarConfig,
+) -> Option<String> {
+    first_member_agent_value(snapshot, workspace, collapsed_groups, |pane_tokens| {
+        agents_config
+            .state_icon_override(pane_tokens)
+            .map(|_| agents_config.state_icon_total(pane_tokens))
+    })
+    .flatten()
+}
+
+fn first_member_agent_value<T>(
+    snapshot: &ClientShellSnapshot,
+    workspace: &ClientShellWorkspace,
+    collapsed_groups: &HashSet<String>,
+    read_value: impl Fn(&std::collections::HashMap<String, String>) -> Option<T>,
+) -> Option<T> {
     let member_ids = displayed_workspace_members(snapshot, workspace, collapsed_groups)
         .into_iter()
         .map(|member| member.workspace_id.as_str())
@@ -705,9 +740,7 @@ pub(in crate::client::shell) fn displayed_workspace_state_icon(
         .agents
         .iter()
         .filter(|agent| member_ids.contains(agent.workspace_id.as_str()))
-        .find_map(|agent| {
-            agents_config.state_icon_override(&agent.tokens.iter().cloned().collect())
-        })
+        .find_map(|agent| read_value(&agent.tokens.iter().cloned().collect()))
 }
 
 pub(in crate::client::shell) fn workspace_rows(
@@ -739,11 +772,13 @@ pub(in crate::client::shell) fn workspace_rows(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(in crate::client::shell) fn render_workspace_rows(
     buffer: &mut Buffer,
     area: Rect,
     status: crate::api::schema::AgentStatus,
     state_icon: &str,
+    state_icon_total: Option<&str>,
     entry: &WorkspaceEntry,
     rows: Vec<Vec<crate::ui::ResolvedToken>>,
     focused: bool,
@@ -806,6 +841,7 @@ pub(in crate::client::shell) fn render_workspace_rows(
                 state_icon,
                 Style::default().fg(status_color(status, palette)),
             ),
+            state_icon_total.map(|total_text| (total_text, Style::default().fg(palette.overlay0))),
             Style::default().fg(status_color(status, palette)),
             workspace_style,
             secondary_style,

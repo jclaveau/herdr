@@ -461,6 +461,24 @@ where
     deserialize_custom_token(deserializer, "state_icon_total_token")
 }
 
+fn capped_token_value(
+    token_reference: Option<&str>,
+    tokens: &std::collections::HashMap<String, String>,
+    max_cells: usize,
+) -> Option<String> {
+    let token_name = token_reference?.strip_prefix('$')?;
+    let token_value = tokens.get(token_name)?;
+    let mut used_cells = 0;
+    let capped_value = token_value
+        .chars()
+        .take_while(|value_char| {
+            used_cells += unicode_width::UnicodeWidthChar::width(*value_char).unwrap_or(0);
+            used_cells <= max_cells
+        })
+        .collect::<String>();
+    (!capped_value.is_empty()).then_some(capped_value)
+}
+
 fn deserialize_custom_token<'de, D>(
     deserializer: D,
     config_key: &str,
@@ -485,29 +503,33 @@ where
 impl AgentsSidebarConfig {
     /// The `state_icon_token` value to show instead of the state icon, if any,
     /// cut to `STATE_ICON_MAX_CELLS` so a long value cannot push the row's
-    /// other tokens out.
+    /// other tokens out. Beside a `state_icon_total` value each icon gets one
+    /// cell, so the pair takes the room of one two-cell value.
     pub(crate) fn state_icon_override(
         &self,
         tokens: &std::collections::HashMap<String, String>,
     ) -> Option<String> {
-        let token_name = self.state_icon_token.as_deref()?.strip_prefix('$')?;
-        let token_value = tokens.get(token_name)?;
-        let mut used_cells = 0;
-        let capped_value = token_value
-            .chars()
-            .take_while(|value_char| {
-                used_cells += unicode_width::UnicodeWidthChar::width(*value_char).unwrap_or(0);
-                used_cells <= STATE_ICON_MAX_CELLS
-            })
-            .collect::<String>();
-        (!capped_value.is_empty()).then_some(capped_value)
+        let max_cells = if self.state_icon_total(tokens).is_some() {
+            1
+        } else {
+            STATE_ICON_MAX_CELLS
+        };
+        capped_token_value(self.state_icon_token.as_deref(), tokens, max_cells)
     }
 
+    /// The `state_icon_total_token` value to show left of the state icon. It
+    /// needs a `state_icon_token` value too: a total alone would stand beside
+    /// the built-in icon, which says nothing about the same work.
     pub(crate) fn state_icon_total(
         &self,
-        _tokens: &std::collections::HashMap<String, String>,
+        tokens: &std::collections::HashMap<String, String>,
     ) -> Option<String> {
-        None
+        capped_token_value(
+            self.state_icon_token.as_deref(),
+            tokens,
+            STATE_ICON_MAX_CELLS,
+        )?;
+        capped_token_value(self.state_icon_total_token.as_deref(), tokens, 1)
     }
 
     pub(crate) fn rows_for_agent(&self, agent: Option<Agent>) -> &AgentSidebarRows {

@@ -460,6 +460,12 @@ pub(super) fn render_expanded(
                     collapsed_groups,
                     &config.agents,
                 );
+                let state_icon_total = super::sidebar::displayed_workspace_state_icon_total(
+                    snapshot,
+                    workspace,
+                    collapsed_groups,
+                    &config.agents,
+                );
                 let tokens = super::sidebar::workspace_rows(
                     workspace,
                     status,
@@ -488,6 +494,7 @@ pub(super) fn render_expanded(
                     state_icon
                         .as_deref()
                         .unwrap_or_else(|| status_icon(status, config.status_indicators)),
+                    state_icon_total.as_deref(),
                     entry,
                     tokens,
                     endpoint_active && workspace.focused,

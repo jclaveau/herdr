@@ -262,6 +262,28 @@ rows = [["state_icon", { token = "machine", fg = "#fff", bold = true, dim = true
     }
 
     #[test]
+    fn total_icon_takes_its_width_from_the_row_budget() {
+        let config: AgentsSidebarConfig =
+            toml::from_str(r#"rows = [["state_icon", "workspace"]]"#).unwrap();
+        let mut entry = entry();
+        entry.workspace = "long-workspace-name".into();
+        let rows = agent_rows(&config, context(&entry), "working");
+        let theme = ratatui::style::Style::default();
+        let spans = super::super::resolved_token_spans(
+            &rows[0],
+            ("◔", theme),
+            Some(("⧖", theme)),
+            theme,
+            theme,
+            theme,
+            theme,
+            &super::super::Palette::catppuccin(),
+            10,
+        );
+        assert_eq!(ratatui::text::Line::from(spans).to_string(), "⧖◔ long-w…");
+    }
+
+    #[test]
     fn conditional_style_survives_truncation_and_removes_theme_modifiers() {
         use ratatui::style::{Color, Modifier, Style};
         let config: AgentsSidebarConfig = toml::from_str(r##"
@@ -277,6 +299,7 @@ rows = [[{ token = "workspace", rules = [{ equals = "long-workspace-name", fg = 
             let spans = super::super::resolved_token_spans(
                 &rows[0],
                 ("*", theme),
+                None,
                 theme,
                 theme,
                 theme,

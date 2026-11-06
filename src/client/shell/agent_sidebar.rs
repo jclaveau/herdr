@@ -16,6 +16,7 @@ pub(super) struct AgentRow {
     pub(super) focused: bool,
     pub(super) rows: Vec<Vec<crate::ui::ResolvedToken>>,
     pub(super) icon_override: Option<String>,
+    pub(super) icon_total: Option<String>,
 }
 
 pub(super) fn ordered_agent_pane_ids(
@@ -317,6 +318,7 @@ pub(super) fn agent_row(
         focused: agent.focused,
         rows,
         icon_override: config.agents.state_icon_override(&tokens),
+        icon_total: config.agents.state_icon_total(&tokens),
     })
 }
 
@@ -363,6 +365,9 @@ pub(super) fn render_agent_row(
         spans.extend(crate::ui::resolved_token_spans(
             tokens,
             icon,
+            row.icon_total
+                .as_deref()
+                .map(|total_text| (total_text, Style::default().fg(palette.overlay0))),
             status_style,
             name_style,
             secondary,
