@@ -106,6 +106,7 @@ pub(crate) fn agent_panel_entries_from(
 pub(crate) fn resolved_token_spans(
     resolved: &[ResolvedToken],
     state_icon: (&str, Style),
+    state_icon_total: Option<(&str, Style)>,
     state_text_style: Style,
     workspace_style: Style,
     secondary_style: Style,
@@ -116,7 +117,10 @@ pub(crate) fn resolved_token_spans(
     let fixed_widths = resolved
         .iter()
         .map(|token| match &token.kind {
-            ResolvedTokenKind::StateIcon => display_width(state_icon.0),
+            ResolvedTokenKind::StateIcon => {
+                display_width(state_icon.0)
+                    + state_icon_total.map_or(0, |(total_text, _)| display_width(total_text))
+            }
             ResolvedTokenKind::GitStatus { ahead, behind } => {
                 usize::from(*ahead > 0) * display_width(&format!("↑{ahead}"))
                     + usize::from(*behind > 0) * display_width(&format!("↓{behind}"))
@@ -223,10 +227,18 @@ pub(crate) fn resolved_token_spans(
             ));
         }
         match &token.kind {
-            ResolvedTokenKind::StateIcon => spans.push(Span::styled(
-                state_icon.0.to_string(),
-                apply_token_style(state_icon.1, token.style),
-            )),
+            ResolvedTokenKind::StateIcon => {
+                if let Some((total_text, total_style)) = state_icon_total {
+                    spans.push(Span::styled(
+                        total_text.to_string(),
+                        apply_token_style(total_style, token.style),
+                    ));
+                }
+                spans.push(Span::styled(
+                    state_icon.0.to_string(),
+                    apply_token_style(state_icon.1, token.style),
+                ));
+            }
             ResolvedTokenKind::StateText(text) => spans.push(Span::styled(
                 truncate_end(text, budgets[index]),
                 apply_token_style(state_text_style, token.style),

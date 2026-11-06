@@ -15,6 +15,8 @@ pub(super) struct AgentRow {
     pub(super) status: crate::api::schema::AgentStatus,
     pub(super) focused: bool,
     pub(super) rows: Vec<Vec<crate::ui::ResolvedToken>>,
+    pub(super) icon_override: Option<String>,
+    pub(super) icon_total: Option<String>,
 }
 
 pub(super) fn ordered_agent_pane_ids(
@@ -315,6 +317,8 @@ pub(super) fn agent_row(
         status: agent.agent_status,
         focused: agent.focused,
         rows,
+        icon_override: config.agents.state_icon_override(&tokens),
+        icon_total: config.agents.state_icon_total(&tokens),
     })
 }
 
@@ -342,7 +346,9 @@ pub(super) fn render_agent_row(
     let status_style = Style::default().fg(status_color(row.status, palette));
     let secondary = Style::default().fg(palette.overlay0);
     let icon = (
-        status_icon(row.status, config.status_indicators),
+        row.icon_override
+            .as_deref()
+            .unwrap_or_else(|| status_icon(row.status, config.status_indicators)),
         Style::default().fg(status_color(row.status, palette)),
     );
     let rows = if row.rows.is_empty() {
@@ -359,6 +365,9 @@ pub(super) fn render_agent_row(
         spans.extend(crate::ui::resolved_token_spans(
             tokens,
             icon,
+            row.icon_total
+                .as_deref()
+                .map(|total_text| (total_text, Style::default().fg(palette.overlay0))),
             status_style,
             name_style,
             secondary,

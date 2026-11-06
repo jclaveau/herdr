@@ -1079,6 +1079,18 @@
           "description": "Complete Agent-row overrides keyed by strict canonical agent id. Agents without an override use ui.sidebar.agents.rows."
         },
         {
+          "key": "ui.sidebar.agents.state_icon_token",
+          "type": "string",
+          "default": "unset",
+          "description": "A $name metadata token whose non-empty value replaces the state_icon glyph in every agent state, keeping the status color; e.g. \"$watch\" for a progress pie a background watch reports. The value is cut to 2 cells. Applies to the expanded and collapsed Agent sidebar, and to Spaces rows, which take the token of the first agent pane in the workspace that reports it. Built-in token names are refused."
+        },
+        {
+          "key": "ui.sidebar.agents.state_icon_total_token",
+          "type": "string",
+          "default": "unset",
+          "description": "A $name metadata token whose non-empty value shows in a neutral color left of the state_icon_token value, which keeps the status color; e.g. \"$watch_total\" for a pie of a whole CI run beside the pie of its running job. Both values are then cut to 1 cell. Needs a state_icon_token value to show. Applies to expanded Agent and Spaces rows: collapsed rows have one icon cell, which shows the state_icon_token value. Built-in token names are refused."
+        },
+        {
           "key": "ui.sidebar.spaces.row_gap",
           "type": "integer",
           "default": "0",

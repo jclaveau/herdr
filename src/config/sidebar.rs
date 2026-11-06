@@ -427,9 +427,111 @@ pub struct AgentsSidebarConfig {
     #[serde(default, deserialize_with = "deserialize_rows_by_agent")]
     pub rows_by_agent: BTreeMap<String, AgentSidebarRows>,
     pub row_gap: u16,
+    /// A custom `$` token whose value, when set, replaces the `state_icon`
+    /// glyph in every state; the icon keeps its status color. E.g. a progress
+    /// pie a background watch reports. A Spaces row takes the value of the
+    /// first agent pane in its workspace that reports the token.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_state_icon_token",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub state_icon_token: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_state_icon_total_token",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub state_icon_total_token: Option<String>,
+}
+
+const STATE_ICON_MAX_CELLS: usize = 2;
+
+fn deserialize_state_icon_token<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    deserialize_custom_token(deserializer, "state_icon_token")
+}
+
+fn deserialize_state_icon_total_token<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    deserialize_custom_token(deserializer, "state_icon_total_token")
+}
+
+fn capped_token_value(
+    token_reference: Option<&str>,
+    tokens: &std::collections::HashMap<String, String>,
+    max_cells: usize,
+) -> Option<String> {
+    let token_name = token_reference?.strip_prefix('$')?;
+    let token_value = tokens.get(token_name)?;
+    let mut used_cells = 0;
+    let capped_value = token_value
+        .chars()
+        .take_while(|value_char| {
+            used_cells += unicode_width::UnicodeWidthChar::width(*value_char).unwrap_or(0);
+            used_cells <= max_cells
+        })
+        .collect::<String>();
+    (!capped_value.is_empty()).then_some(capped_value)
+}
+
+fn deserialize_custom_token<'de, D>(
+    deserializer: D,
+    config_key: &str,
+) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::IntoDeserializer;
+    let Some(token_text) = Option::<String>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    let parsed_token: Result<AgentSidebarToken, D::Error> =
+        AgentSidebarToken::deserialize(token_text.as_str().into_deserializer());
+    match parsed_token? {
+        AgentSidebarToken::Custom(_) => Ok(Some(token_text)),
+        _ => Err(serde::de::Error::custom(format!(
+            "{config_key} must be a custom `$` token, got `{token_text}`"
+        ))),
+    }
 }
 
 impl AgentsSidebarConfig {
+    /// The `state_icon_token` value to show instead of the state icon, if any,
+    /// cut to `STATE_ICON_MAX_CELLS` so a long value cannot push the row's
+    /// other tokens out. Beside a `state_icon_total` value each icon gets one
+    /// cell, so the pair takes the room of one two-cell value.
+    pub(crate) fn state_icon_override(
+        &self,
+        tokens: &std::collections::HashMap<String, String>,
+    ) -> Option<String> {
+        let max_cells = if self.state_icon_total(tokens).is_some() {
+            1
+        } else {
+            STATE_ICON_MAX_CELLS
+        };
+        capped_token_value(self.state_icon_token.as_deref(), tokens, max_cells)
+    }
+
+    /// The `state_icon_total_token` value to show left of the state icon. It
+    /// needs a `state_icon_token` value too: a total alone would stand beside
+    /// the built-in icon, which says nothing about the same work.
+    pub(crate) fn state_icon_total(
+        &self,
+        tokens: &std::collections::HashMap<String, String>,
+    ) -> Option<String> {
+        capped_token_value(
+            self.state_icon_token.as_deref(),
+            tokens,
+            STATE_ICON_MAX_CELLS,
+        )?;
+        capped_token_value(self.state_icon_total_token.as_deref(), tokens, 1)
+    }
+
     pub(crate) fn rows_for_agent(&self, agent: Option<Agent>) -> &AgentSidebarRows {
         agent
             .and_then(|agent| self.rows_by_agent.get(crate::detect::agent_label(agent)))
@@ -451,6 +553,8 @@ impl Default for AgentsSidebarConfig {
             ],
             rows_by_agent: BTreeMap::new(),
             row_gap: DEFAULT_SIDEBAR_ROW_GAP,
+            state_icon_token: None,
+            state_icon_total_token: None,
         }
     }
 }
@@ -485,6 +589,150 @@ pub struct SidebarConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn state_icon_token_replaces_the_icon() {
+        let config: AgentsSidebarConfig = toml::from_str("state_icon_token = '$watch'").unwrap();
+        assert_eq!(
+            config.state_icon_override(&std::collections::HashMap::from([(
+                "watch".to_string(),
+                "◔".to_string()
+            )])),
+            Some("◔".to_string())
+        );
+    }
+
+    #[test]
+    fn state_icon_token_leaves_the_icon_without_a_value() {
+        let config: AgentsSidebarConfig = toml::from_str("state_icon_token = '$watch'").unwrap();
+        assert_eq!(
+            [
+                config.state_icon_override(&Default::default()),
+                config.state_icon_override(&std::collections::HashMap::from([(
+                    "watch".to_string(),
+                    String::new()
+                )])),
+                AgentsSidebarConfig::default().state_icon_override(
+                    &std::collections::HashMap::from([("watch".to_string(), "◔".to_string())]),
+                ),
+            ],
+            [None, None, None]
+        );
+    }
+
+    #[test]
+    fn state_icon_token_refuses_a_builtin_token() {
+        assert_eq!(
+            toml::from_str::<AgentsSidebarConfig>("state_icon_token = 'workspace'")
+                .unwrap_err()
+                .message(),
+            "state_icon_token must be a custom `$` token, got `workspace`"
+        );
+    }
+
+    #[test]
+    fn state_icon_token_caps_the_value_at_two_cells() {
+        let config: AgentsSidebarConfig = toml::from_str("state_icon_token = '$watch'").unwrap();
+        assert_eq!(
+            [
+                config.state_icon_override(&std::collections::HashMap::from([(
+                    "watch".to_string(),
+                    "⧗ 12/40 steps remaining".to_string()
+                )])),
+                config.state_icon_override(&std::collections::HashMap::from([(
+                    "watch".to_string(),
+                    "◔+2".to_string()
+                )])),
+                config.state_icon_override(&std::collections::HashMap::from([(
+                    "watch".to_string(),
+                    "界x".to_string()
+                )])),
+            ],
+            [
+                Some("⧗ ".to_string()),
+                Some("◔+".to_string()),
+                Some("界".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn state_icon_token_keeps_the_token_parse_error() {
+        assert_eq!(
+            toml::from_str::<AgentsSidebarConfig>("state_icon_token = '$'")
+                .unwrap_err()
+                .message(),
+            "invalid custom sidebar token `$`"
+        );
+    }
+
+    #[test]
+    fn state_icon_total_token_takes_one_cell_left_of_the_icon() {
+        let config: AgentsSidebarConfig =
+            toml::from_str("state_icon_token = '$watch'\nstate_icon_total_token = '$watch_total'")
+                .unwrap();
+        let tokens = std::collections::HashMap::from([
+            ("watch".to_string(), "◔+".to_string()),
+            ("watch_total".to_string(), "⧖ 2 queued".to_string()),
+        ]);
+        assert_eq!(
+            [
+                config.state_icon_total(&tokens),
+                config.state_icon_override(&tokens),
+            ],
+            [Some("⧖".to_string()), Some("◔".to_string())]
+        );
+    }
+
+    #[test]
+    fn state_icon_token_keeps_two_cells_without_a_total_value() {
+        let config: AgentsSidebarConfig =
+            toml::from_str("state_icon_token = '$watch'\nstate_icon_total_token = '$watch_total'")
+                .unwrap();
+        let tokens = std::collections::HashMap::from([("watch".to_string(), "◔+".to_string())]);
+        assert_eq!(
+            [
+                config.state_icon_total(&tokens),
+                config.state_icon_override(&tokens),
+            ],
+            [None, Some("◔+".to_string())]
+        );
+    }
+
+    #[test]
+    fn state_icon_total_token_needs_the_icon_value_too() {
+        let config: AgentsSidebarConfig =
+            toml::from_str("state_icon_token = '$watch'\nstate_icon_total_token = '$watch_total'")
+                .unwrap();
+        assert_eq!(
+            config.state_icon_total(&std::collections::HashMap::from([(
+                "watch_total".to_string(),
+                "⧖".to_string()
+            )])),
+            None
+        );
+    }
+
+    #[test]
+    fn state_icon_total_token_refuses_a_builtin_token() {
+        assert_eq!(
+            toml::from_str::<AgentsSidebarConfig>("state_icon_total_token = 'workspace'")
+                .unwrap_err()
+                .message(),
+            "state_icon_total_token must be a custom `$` token, got `workspace`"
+        );
+    }
+
+    #[test]
+    fn state_icon_token_round_trips() {
+        let config: AgentsSidebarConfig =
+            toml::from_str("state_icon_token = '$watch'\nstate_icon_total_token = '$watch_total'")
+                .unwrap();
+        assert_eq!(
+            toml::from_str::<AgentsSidebarConfig>(&toml::to_string(&config).unwrap()).unwrap(),
+            config
+        );
+    }
 
     #[test]
     fn defaults_match_the_compact_agent_and_existing_space_layouts() {

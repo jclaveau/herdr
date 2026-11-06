@@ -650,6 +650,281 @@ fn pane_cycle_last_and_agent_actions_resolve_to_stable_pane_ids() {
 }
 
 #[test]
+fn collapsed_agent_row_shows_the_state_icon_token() {
+    let mut projected = snapshot();
+    projected.agents = vec![ClientShellAgent {
+        pane_id: "pane_1".into(),
+        workspace_id: "ws_1".into(),
+        tab_id: "tab_1".into(),
+        name: Some("pi one".into()),
+        display_agent: None,
+        agent: Some("pi".into()),
+        title: None,
+        terminal_title: None,
+        terminal_title_stripped: None,
+        agent_status: AgentStatus::Working,
+        state_change_seq: 1,
+        state_labels: Vec::new(),
+        tokens: vec![("watch".into(), "◔+".into())],
+        focused: true,
+    }];
+    let mut config = Config::default();
+    config.ui.sidebar.agents.state_icon_token = Some("$watch".into());
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
+    state.sidebar_collapsed = true;
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+    let frame = state.compose(106, 20).expect("collapsed sidebar");
+    let agent_rect = state.hits.agents[0].0;
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    assert_eq!(
+        [
+            buffer[(agent_rect.x + 2, agent_rect.y)].symbol(),
+            buffer[(agent_rect.x + 3, agent_rect.y)].symbol(),
+        ],
+        ["◔", "│"]
+    );
+}
+
+#[test]
+fn workspace_row_shows_the_first_pane_state_icon_token() {
+    let mut projected = snapshot();
+    projected.agents = vec![
+        ClientShellAgent {
+            pane_id: "pane_1".into(),
+            workspace_id: "ws_1".into(),
+            tab_id: "tab_1".into(),
+            name: Some("pi one".into()),
+            display_agent: None,
+            agent: Some("pi".into()),
+            title: None,
+            terminal_title: None,
+            terminal_title_stripped: None,
+            agent_status: AgentStatus::Done,
+            state_change_seq: 1,
+            state_labels: Vec::new(),
+            tokens: vec![("watch".into(), "◔".into())],
+            focused: true,
+        },
+        ClientShellAgent {
+            pane_id: "pane_2".into(),
+            workspace_id: "ws_1".into(),
+            tab_id: "tab_1".into(),
+            name: Some("pi two".into()),
+            display_agent: None,
+            agent: Some("pi".into()),
+            title: None,
+            terminal_title: None,
+            terminal_title_stripped: None,
+            agent_status: AgentStatus::Working,
+            state_change_seq: 2,
+            state_labels: Vec::new(),
+            tokens: vec![("watch".into(), "◕".into())],
+            focused: false,
+        },
+    ];
+    let mut config = Config::default();
+    config.ui.sidebar.agents.state_icon_token = Some("$watch".into());
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+    let frame = state.compose(106, 20).expect("expanded sidebar");
+    let workspace_rect = state.hits.workspaces[0].rect;
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    assert_eq!(
+        buffer[(workspace_rect.x + 1, workspace_rect.y)].symbol(),
+        "◔"
+    );
+}
+
+fn state_with_total_icon_tokens(sidebar_collapsed: bool) -> ClientShellState {
+    let mut projected = snapshot();
+    projected.agents = vec![ClientShellAgent {
+        pane_id: "pane_1".into(),
+        workspace_id: "ws_1".into(),
+        tab_id: "tab_1".into(),
+        name: Some("pi one".into()),
+        display_agent: None,
+        agent: Some("pi".into()),
+        title: None,
+        terminal_title: None,
+        terminal_title_stripped: None,
+        agent_status: AgentStatus::Working,
+        state_change_seq: 1,
+        state_labels: Vec::new(),
+        tokens: vec![
+            ("watch".into(), "◔".into()),
+            ("watch_total".into(), "⧖".into()),
+        ],
+        focused: true,
+    }];
+    let mut config = Config::default();
+    config.ui.sidebar.agents.state_icon_token = Some("$watch".into());
+    config.ui.sidebar.agents.state_icon_total_token = Some("$watch_total".into());
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
+    state.sidebar_collapsed = sidebar_collapsed;
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+    state
+}
+
+#[test]
+fn expanded_agent_row_colours_only_the_right_icon() {
+    let mut state = state_with_total_icon_tokens(false);
+    let frame = state.compose(106, 20).expect("expanded sidebar");
+    let agent_rect = state.hits.agents[0].0;
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    let total_cell = &buffer[(agent_rect.x + 1, agent_rect.y)];
+    let icon_cell = &buffer[(agent_rect.x + 2, agent_rect.y)];
+    assert_eq!(
+        [
+            (total_cell.symbol(), total_cell.fg),
+            (icon_cell.symbol(), icon_cell.fg)
+        ],
+        [
+            ("⧖", state.config.palette.overlay0),
+            (
+                "◔",
+                status_color(AgentStatus::Working, &state.config.palette)
+            ),
+        ]
+    );
+}
+
+#[test]
+fn expanded_workspace_row_colours_only_the_right_icon() {
+    let mut state = state_with_total_icon_tokens(false);
+    let frame = state.compose(106, 20).expect("expanded sidebar");
+    let workspace_rect = state.hits.workspaces[0].rect;
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    let total_cell = &buffer[(workspace_rect.x + 1, workspace_rect.y)];
+    let icon_cell = &buffer[(workspace_rect.x + 2, workspace_rect.y)];
+    assert_eq!(
+        [
+            (total_cell.symbol(), total_cell.fg),
+            (icon_cell.symbol(), icon_cell.fg)
+        ],
+        [
+            ("⧖", state.config.palette.overlay0),
+            (
+                "◔",
+                status_color(AgentStatus::Working, &state.config.palette)
+            ),
+        ]
+    );
+}
+
+#[test]
+fn workspace_row_takes_the_total_from_the_pane_it_takes_the_icon_from() {
+    let mut projected = snapshot();
+    projected.agents = vec![
+        ClientShellAgent {
+            pane_id: "pane_1".into(),
+            workspace_id: "ws_1".into(),
+            tab_id: "tab_1".into(),
+            name: Some("pi".into()),
+            display_agent: None,
+            agent: Some("pi".into()),
+            title: None,
+            terminal_title: None,
+            terminal_title_stripped: None,
+            agent_status: AgentStatus::Working,
+            state_change_seq: 1,
+            state_labels: Vec::new(),
+            tokens: vec![("watch".into(), "◔".into())],
+            focused: false,
+        },
+        ClientShellAgent {
+            pane_id: "pane_2".into(),
+            workspace_id: "ws_1".into(),
+            tab_id: "tab_1".into(),
+            name: Some("pi".into()),
+            display_agent: None,
+            agent: Some("pi".into()),
+            title: None,
+            terminal_title: None,
+            terminal_title_stripped: None,
+            agent_status: AgentStatus::Working,
+            state_change_seq: 1,
+            state_labels: Vec::new(),
+            tokens: vec![
+                ("watch".into(), "◑".into()),
+                ("watch_total".into(), "⧖".into()),
+            ],
+            focused: false,
+        },
+    ];
+    let mut config = Config::default();
+    config.ui.sidebar.agents.state_icon_token = Some("$watch".into());
+    config.ui.sidebar.agents.state_icon_total_token = Some("$watch_total".into());
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+    let frame = state.compose(106, 20).expect("expanded sidebar");
+    let workspace_rect = state.hits.workspaces[0].rect;
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    assert_eq!(
+        [
+            buffer[(workspace_rect.x + 1, workspace_rect.y)].symbol(),
+            buffer[(workspace_rect.x + 2, workspace_rect.y)].symbol(),
+        ],
+        ["◔", " "]
+    );
+}
+
+#[test]
+fn collapsed_rows_have_room_for_the_right_icon_only() {
+    let mut state = state_with_total_icon_tokens(true);
+    let frame = state.compose(106, 20).expect("collapsed sidebar");
+    let agent_rect = state.hits.agents[0].0;
+    let workspace_rect = state.hits.workspaces[0].rect;
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    assert_eq!(
+        [
+            buffer[(agent_rect.x + 2, agent_rect.y)].symbol(),
+            buffer[(agent_rect.x + 3, agent_rect.y)].symbol(),
+            buffer[(workspace_rect.x + 2, workspace_rect.y)].symbol(),
+            buffer[(workspace_rect.x + 3, workspace_rect.y)].symbol(),
+        ],
+        ["◔", "│", "◔", "│"]
+    );
+}
+
+#[test]
+fn collapsed_workspace_row_shows_the_state_icon_token() {
+    let mut projected = snapshot();
+    projected.agents = vec![ClientShellAgent {
+        pane_id: "pane_1".into(),
+        workspace_id: "ws_1".into(),
+        tab_id: "tab_1".into(),
+        name: Some("pi one".into()),
+        display_agent: None,
+        agent: Some("pi".into()),
+        title: None,
+        terminal_title: None,
+        terminal_title_stripped: None,
+        agent_status: AgentStatus::Done,
+        state_change_seq: 1,
+        state_labels: Vec::new(),
+        tokens: vec![("watch".into(), "◔".into())],
+        focused: true,
+    }];
+    let mut config = Config::default();
+    config.ui.sidebar.agents.state_icon_token = Some("$watch".into());
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
+    state.sidebar_collapsed = true;
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+    let frame = state.compose(106, 20).expect("collapsed sidebar");
+    let workspace_rect = state.hits.workspaces[0].rect;
+    let buffer = frame.to_ratatui_buffer().expect("frame should reconstruct");
+    assert_eq!(
+        buffer[(workspace_rect.x + 2, workspace_rect.y)].symbol(),
+        "◔"
+    );
+}
+
+#[test]
 fn agent_sidebar_honors_priority_symbols_tokens_and_stable_hits() {
     let mut projected = snapshot();
     let mut second_pane = projected.panes[0].clone();
