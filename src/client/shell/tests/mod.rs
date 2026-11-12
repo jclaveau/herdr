@@ -262,3 +262,42 @@ mod mobile;
 mod mouse_selection;
 mod popup_focus_projection;
 mod startup_overlays;
+
+#[test]
+fn status_icon_draws_each_style() {
+    use crate::config::StatusIndicatorStyle;
+    assert_eq!(
+        [
+            StatusIndicatorStyle::Dots,
+            StatusIndicatorStyle::Symbols,
+            StatusIndicatorStyle::MaterialDots,
+            StatusIndicatorStyle::MaterialSymbols,
+        ]
+        .map(|style| [
+            AgentStatus::Working,
+            AgentStatus::Blocked,
+            AgentStatus::Done,
+            AgentStatus::Idle,
+            AgentStatus::Unknown,
+        ]
+        .map(|status| status_icon(status, style))),
+        [
+            ["●", "●", "●", "○", "·"],
+            ["◐", "×", "✓", "○", "·"],
+            [
+                "\u{F09DE}",
+                "\u{F09DE}",
+                "\u{F09DE}",
+                "\u{F0130}",
+                "\u{F09DF}"
+            ],
+            [
+                "\u{F1396}",
+                "\u{F0156}",
+                "\u{F012C}",
+                "\u{F0130}",
+                "\u{F09DF}"
+            ],
+        ]
+    );
+}

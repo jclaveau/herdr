@@ -338,6 +338,8 @@ const DEFAULT_CONFIG: &str = r##"# herdr configuration
 
 # Agent status indicators: "dots" preserves the compact color marks; "symbols" uses
 # distinct static glyphs for blocked, working, done, idle, and unknown states.
+# "material-dots" and "material-symbols" draw the same with Nerd Font Material Design
+# glyphs, sidebar markers included; they need a Nerd Font in the terminal.
 # status_indicators = "dots"
 
 # Accent color for highlights, borders, and navigation UI.

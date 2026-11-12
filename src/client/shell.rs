@@ -193,6 +193,23 @@ fn status_icon(
         (StatusIndicatorStyle::Symbols, AgentStatus::Done) => "✓",
         (StatusIndicatorStyle::Symbols, AgentStatus::Idle) => "○",
         (StatusIndicatorStyle::Symbols, AgentStatus::Unknown) => "·",
+        // Nerd Font Material Design look-alikes: circle-medium, circle-outline,
+        // circle-small, circle-half-full, close, check.
+        (
+            StatusIndicatorStyle::MaterialDots,
+            AgentStatus::Working | AgentStatus::Blocked | AgentStatus::Done,
+        ) => "\u{F09DE}",
+        (StatusIndicatorStyle::MaterialSymbols, AgentStatus::Blocked) => "\u{F0156}",
+        (StatusIndicatorStyle::MaterialSymbols, AgentStatus::Working) => "\u{F1396}",
+        (StatusIndicatorStyle::MaterialSymbols, AgentStatus::Done) => "\u{F012C}",
+        (
+            StatusIndicatorStyle::MaterialDots | StatusIndicatorStyle::MaterialSymbols,
+            AgentStatus::Idle,
+        ) => "\u{F0130}",
+        (
+            StatusIndicatorStyle::MaterialDots | StatusIndicatorStyle::MaterialSymbols,
+            AgentStatus::Unknown,
+        ) => "\u{F09DF}",
     }
 }
 

@@ -194,7 +194,7 @@ pub(crate) fn render_collapsed_sidebar(
         hits.sidebar_toggle.x,
         hits.sidebar_toggle.y,
         hits.sidebar_toggle.width,
-        "»",
+        config.status_indicators.expand_sidebar_marker(),
         if super::super::global_menu::global_menu_attention(snapshot) {
             Style::default()
                 .fg(palette.accent)
@@ -364,6 +364,7 @@ pub(crate) fn render_sidebar(
             snapshot,
             entry.index,
             state.collapsed_groups,
+            config.status_indicators,
             palette,
         );
         hits.workspaces.push(WorkspaceHit {
@@ -474,7 +475,7 @@ pub(crate) fn render_sidebar(
         hits.sidebar_toggle.x,
         hits.sidebar_toggle.y,
         hits.sidebar_toggle.width,
-        "«",
+        config.status_indicators.collapse_sidebar_marker(),
         Style::default().fg(palette.overlay0),
     );
 }
@@ -630,6 +631,7 @@ pub(in crate::client::shell) fn render_parent_group_toggle(
     snapshot: &ClientShellSnapshot,
     workspace_index: usize,
     collapsed_groups: &HashSet<String>,
+    status_indicators: crate::config::StatusIndicatorStyle,
     palette: &Palette,
 ) -> Option<(Rect, String)> {
     let key = parent_group_key(snapshot, workspace_index)?;
@@ -644,11 +646,7 @@ pub(in crate::client::shell) fn render_parent_group_toggle(
         toggle.x,
         toggle.y,
         toggle.width,
-        if collapsed_groups.contains(&key) {
-            "▸"
-        } else {
-            "▾"
-        },
+        status_indicators.group_toggle_marker(collapsed_groups.contains(&key)),
         Style::default().fg(palette.accent),
     );
     Some((toggle, key))

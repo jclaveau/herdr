@@ -164,7 +164,12 @@ pub(super) fn render_settings_overlay(
                 content,
                 "agent status indicators",
                 "choose color dots or distinct symbols for each state",
-                &["color dots  ● ● ● ○ ·", "distinct symbols  × ◐ ✓ ○ ·"],
+                &[
+                    "color dots  ● ● ● ○ ·",
+                    "distinct symbols  × ◐ ✓ ○ ·",
+                    "material dots (Nerd Font)  \u{F09DE} \u{F09DE} \u{F09DE} \u{F0130} \u{F09DF}",
+                    "material symbols (Nerd Font)  \u{F0156} \u{F1396} \u{F012C} \u{F0130} \u{F09DF}",
+                ],
                 settings.selected,
                 palette,
                 &mut choice_hits,

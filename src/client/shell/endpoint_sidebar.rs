@@ -77,7 +77,7 @@ pub(super) fn render_collapsed(
             } else {
                 (index + 1).to_string()
             };
-            let marker = if collapsed { "▸" } else { "▾" };
+            let marker = config.status_indicators.group_toggle_marker(collapsed);
             put_text(
                 buffer,
                 rect.x,
@@ -236,7 +236,7 @@ pub(super) fn render_collapsed(
         hits.sidebar_toggle.x,
         hits.sidebar_toggle.y,
         hits.sidebar_toggle.width,
-        "»",
+        config.status_indicators.expand_sidebar_marker(),
         Style::default().fg(palette.overlay0),
     );
 }
@@ -414,7 +414,7 @@ pub(super) fn render_expanded(
                 let endpoint = &state.endpoints[*index];
                 let rect = Rect::new(body.x, y, content_width, 1);
                 let collapsed = state.collapsed_endpoints.contains(&endpoint.endpoint_id);
-                let marker = if collapsed { "▸" } else { "▾" };
+                let marker = config.status_indicators.group_toggle_marker(collapsed);
                 let status_badge = render_endpoint_row(
                     buffer,
                     rect,
@@ -517,6 +517,7 @@ pub(super) fn render_expanded(
                     snapshot,
                     entry.index,
                     collapsed_groups,
+                    config.status_indicators,
                     palette,
                 );
                 hits.workspaces.push(WorkspaceHit {
@@ -596,7 +597,7 @@ pub(super) fn render_expanded(
         hits.sidebar_toggle.x,
         hits.sidebar_toggle.y,
         hits.sidebar_toggle.width,
-        "«",
+        config.status_indicators.collapse_sidebar_marker(),
         Style::default().fg(palette.overlay0),
     );
 }

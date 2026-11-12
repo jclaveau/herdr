@@ -109,11 +109,15 @@ enum LegacyAgentPanelScopeConfig {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum StatusIndicatorStyle {
     #[default]
     Dots,
     Symbols,
+    /// Dots drawn with Nerd Font Material Design glyphs.
+    MaterialDots,
+    /// Symbols drawn with Nerd Font Material Design glyphs.
+    MaterialSymbols,
 }
 
 impl StatusIndicatorStyle {
@@ -121,6 +125,40 @@ impl StatusIndicatorStyle {
         match self {
             Self::Dots => "dots",
             Self::Symbols => "symbols",
+            Self::MaterialDots => "material-dots",
+            Self::MaterialSymbols => "material-symbols",
+        }
+    }
+
+    pub fn is_material(self) -> bool {
+        matches!(self, Self::MaterialDots | Self::MaterialSymbols)
+    }
+
+    /// Nerd Font menu-right / menu-down beside the material styles.
+    pub fn group_toggle_marker(self, is_collapsed: bool) -> &'static str {
+        match (self.is_material(), is_collapsed) {
+            (false, true) => "▸",
+            (false, false) => "▾",
+            (true, true) => "\u{F035F}",
+            (true, false) => "\u{F035D}",
+        }
+    }
+
+    /// Nerd Font chevron-double-right beside the material styles.
+    pub fn expand_sidebar_marker(self) -> &'static str {
+        if self.is_material() {
+            "\u{F013E}"
+        } else {
+            "»"
+        }
+    }
+
+    /// Nerd Font chevron-double-left beside the material styles.
+    pub fn collapse_sidebar_marker(self) -> &'static str {
+        if self.is_material() {
+            "\u{F013D}"
+        } else {
+            "«"
         }
     }
 }
@@ -1490,6 +1528,52 @@ status_indicators = "symbols"
         )
         .unwrap();
         assert_eq!(config.ui.status_indicators, StatusIndicatorStyle::Symbols);
+    }
+
+    #[test]
+    fn status_indicator_style_parses_the_material_styles() {
+        let config: Config = toml::from_str("[ui]\nstatus_indicators = \"material-dots\"").unwrap();
+        assert_eq!(
+            config.ui.status_indicators,
+            StatusIndicatorStyle::MaterialDots
+        );
+        let config: Config =
+            toml::from_str("[ui]\nstatus_indicators = \"material-symbols\"").unwrap();
+        assert_eq!(
+            config.ui.status_indicators,
+            StatusIndicatorStyle::MaterialSymbols
+        );
+        assert_eq!(
+            [
+                StatusIndicatorStyle::MaterialDots.as_str(),
+                StatusIndicatorStyle::MaterialSymbols.as_str(),
+            ],
+            ["material-dots", "material-symbols"]
+        );
+    }
+
+    #[test]
+    fn material_styles_draw_material_sidebar_markers() {
+        assert_eq!(
+            [
+                StatusIndicatorStyle::Dots,
+                StatusIndicatorStyle::Symbols,
+                StatusIndicatorStyle::MaterialDots,
+                StatusIndicatorStyle::MaterialSymbols,
+            ]
+            .map(|style| [
+                style.group_toggle_marker(true),
+                style.group_toggle_marker(false),
+                style.expand_sidebar_marker(),
+                style.collapse_sidebar_marker(),
+            ]),
+            [
+                ["▸", "▾", "»", "«"],
+                ["▸", "▾", "»", "«"],
+                ["\u{F035F}", "\u{F035D}", "\u{F013E}", "\u{F013D}"],
+                ["\u{F035F}", "\u{F035D}", "\u{F013E}", "\u{F013D}"],
+            ]
+        );
     }
 
     #[test]

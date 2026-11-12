@@ -297,6 +297,14 @@ fn render_agent_summary(
             (crate::config::StatusIndicatorStyle::Dots, AgentStatus::Blocked) => Some("◉"),
             (crate::config::StatusIndicatorStyle::Dots, AgentStatus::Done) => Some("●"),
             (crate::config::StatusIndicatorStyle::Dots, _) => None,
+            // Nerd Font radiobox-marked, like ◉.
+            (crate::config::StatusIndicatorStyle::MaterialDots, AgentStatus::Blocked) => {
+                Some("\u{F043E}")
+            }
+            (crate::config::StatusIndicatorStyle::MaterialDots, AgentStatus::Done) => {
+                Some("\u{F09DE}")
+            }
+            (crate::config::StatusIndicatorStyle::MaterialDots, _) => None,
             _ => Some(status_icon(status, config.status_indicators)),
         };
         let text = symbol.map_or_else(
